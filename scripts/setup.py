@@ -17,7 +17,7 @@ def check_python_version():
         sys.exit(1)
 
     print(
-        f"✓ Python {sys.version_info.major}.{sys.version_info.minor}.{sys.versiosn_info.micro} detected"
+        f"✓ Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro} detected"
     )
 
 
