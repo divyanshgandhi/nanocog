@@ -8,7 +8,6 @@ import os
 import sys
 import argparse
 import subprocess
-from tqdm import tqdm
 
 
 def check_python_version():
@@ -18,7 +17,7 @@ def check_python_version():
         sys.exit(1)
 
     print(
-        f"✓ Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro} detected"
+        f"✓ Python {sys.version_info.major}.{sys.version_info.minor}.{sys.versiosn_info.micro} detected"
     )
 
 
@@ -36,7 +35,7 @@ def install_dependencies():
     print("Installing dependencies...")
     try:
         subprocess.run(
-            [sys.executable, "-m", "pip", "install", "-r", "requirements.txt"],
+            ["pip", "install", "-r", "requirements.txt"],
             check=True,
         )
         print("✓ Dependencies installed successfully")
