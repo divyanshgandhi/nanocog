@@ -101,7 +101,7 @@ install-gpu:
 	@pip install -r requirements-gpu.txt
 	@echo ""
 	@echo "Note: You might need to install PyTorch with CUDA separately with the command:"
-	@echo "pip install torch>=2.2.0 --extra-index-url https://download.pytorch.org/whl/cu121"
+	@echo "pip install torch==2.7.0 --extra-index-url https://download.pytorch.org/whl/cu126"
 	@echo "Visit https://pytorch.org/get-started/locally/ to find the right command for your CUDA version."
 
 # Run all tests

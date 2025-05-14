@@ -6,6 +6,7 @@ transformers==4.51.3
 accelerate==1.6.0
 bitsandbytes==0.42.0
 peft==0.15.2  # For LoRA
+torch==2.7.0  # Using version compatible with server environment (CUDA 12.6)
 
 # Retrieval
 chromadb==1.0.9

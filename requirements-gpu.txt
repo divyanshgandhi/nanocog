@@ -1,4 +1,4 @@
-# Nano-Cog 0.1 GPU Dependencies (CUDA 12.1)
+# Nano-Cog 0.1 GPU Dependencies (CUDA 12.6)
 
 # Core ML libraries with CUDA support
 transformers==4.51.3
@@ -6,9 +6,9 @@ accelerate==1.6.0
 bitsandbytes==0.42.0  # For quantization
 peft==0.15.2  # For LoRA
 
-# Specific PyTorch version with CUDA 12.1 support
-# Users will need to install the right version for their CUDA version:
-# pip install torch==2.2.0+cu121 -f https://download.pytorch.org/whl/torch_stable.html
+# Specific PyTorch version with CUDA 12.6 support
+# Server environment uses PyTorch 2.7.0 with CUDA 12.6
+torch==2.7.0  # Will use the CUDA version available on the system
 
 # Retrieval
 chromadb==1.0.9

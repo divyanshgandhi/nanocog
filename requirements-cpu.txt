@@ -4,7 +4,7 @@
 transformers==4.51.3
 accelerate==1.6.0
 peft==0.15.2  # For LoRA
-torch>=2.2.0  # CPU version, no specific CUDA requirements
+torch==2.7.0  # CPU version, matching server environment
 
 # Retrieval
 chromadb==1.0.9
