@@ -1,0 +1,35 @@
+# Nano-Cog 0.1 CPU Dependencies
+
+# Core ML libraries
+transformers==4.51.3
+accelerate==1.6.0
+peft==0.15.2  # For LoRA
+torch>=2.2.0  # CPU version, no specific CUDA requirements
+
+# Retrieval
+chromadb==1.0.9
+sentence-transformers==4.1.0
+
+# Tools
+restrictedpython==8.0
+sympy==1.14.0
+pyyaml==6.0.2
+toml==0.10.2
+
+# Training
+datasets==3.6.0
+trl==0.17.0  # For RLHF
+
+# Evaluation
+pytest==8.3.5
+
+# UI
+streamlit==1.45.1
+
+# Utils
+tqdm==4.67.1
+numpy==2.2.5
+pandas==2.2.3
+matplotlib==3.10.3
+colorama==0.4.6
+huggingface_hub>=0.30.0  # For model downloading 

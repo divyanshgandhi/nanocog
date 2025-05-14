@@ -103,7 +103,7 @@ class ToolDispatcher:
             tool_call (dict): Tool call dict with tool, args, and full_match keys
 
         Returns:
-            str: Result of tool execution
+            dict: Result of tool execution with structure {ok: bool, result: str, error: str}
         """
         tool = tool_call["tool"]
         args = tool_call["args"]
@@ -122,16 +122,40 @@ class ToolDispatcher:
             elif tool == "bash":
                 result = self._execute_bash(args)
             else:
-                return f"Error: Unknown tool '{tool}'"
+                return {"ok": False, "result": "", "error": f"Unknown tool '{tool}'"}
 
             # Check if execution exceeded timeout
             elapsed_time = time.time() - start_time
             if elapsed_time > timeout_sec:
-                return f"Error: {tool} execution timed out ({elapsed_time:.2f}s)"
+                return {
+                    "ok": False,
+                    "result": "",
+                    "error": f"TOOL_ERROR:{tool}:Execution timed out ({elapsed_time:.2f}s)",
+                }
 
-            return result
+            # Check if result is already a structured response
+            if isinstance(result, dict) and all(
+                k in result for k in ["ok", "result", "error"]
+            ):
+                return result
+
+            # Otherwise wrap the successful result
+            return {"ok": True, "result": result, "error": ""}
+
         except Exception as e:
-            return f"Error executing {tool}: {str(e)}"
+            # Sanitize traceback by removing file paths
+            error_msg = str(e)
+            # Remove any absolute file paths from error message
+            error_msg = re.sub(r'File ".*?/([^/]+\.py)"', r'File "\1"', error_msg)
+            # Truncate to 200 chars max
+            if len(error_msg) > 200:
+                error_msg = error_msg[:197] + "..."
+
+            return {
+                "ok": False,
+                "result": "",
+                "error": f"TOOL_ERROR:{tool}:{error_msg}",
+            }
 
     def _execute_calculator(self, expression):
         """
@@ -326,7 +350,7 @@ class ToolDispatcher:
         Process text and execute any tool calls
 
         Args:
-            text (str): Text containing tool calls
+            text (str): Text to process
 
         Returns:
             str: Text with tool calls replaced by results
@@ -336,13 +360,17 @@ class ToolDispatcher:
 
         # Process each tool call
         for tool_call in tool_calls:
-            # Execute tool
-            result = self.execute_tool(tool_call)
+            result_dict = self.execute_tool(tool_call)
 
-            # Replace tool call with result
-            text = text.replace(
-                tool_call["full_match"], f"{tool_call['tool']} result: {result}"
-            )
+            if result_dict["ok"]:
+                # Success case
+                replacement = f"{tool_call['full_match']}\n{result_dict['result']}"
+            else:
+                # Error case - use the marker string for errors
+                replacement = f"{tool_call['full_match']}\n{result_dict['error']}"
+
+            # Replace the tool call in the text
+            text = text.replace(tool_call["full_match"], replacement)
 
         return text
 

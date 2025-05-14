@@ -304,6 +304,11 @@ class NanoCogModel:
                 )
                 self.model.resize_token_embeddings(len(self.tokenizer))
 
+            # Check for meta tensors and abort if found (MODEL-01)
+            for n, p in self.model.named_parameters():
+                if p.is_meta:
+                    raise RuntimeError(f"{n} still on meta")
+
             # Move model to target device
             success = self._move_model_to_device()
             if not success:
@@ -323,7 +328,7 @@ class NanoCogModel:
         self.dse = DynamicSymbolEngine(self.config, self.tokenizer)
 
     def _get_optimal_device(self):
-        """Determine the best available device with verification"""
+        """Determine the best available device with normalization"""
         print("Detecting available compute devices...")
 
         # CUDA (NVIDIA GPU) - First priority
@@ -333,7 +338,8 @@ class NanoCogModel:
                 test_tensor = torch.zeros(1, 1, device="cuda")
                 cuda_device_name = torch.cuda.get_device_name(0)
                 print(f"CUDA is available: {cuda_device_name}")
-                return torch.device("cuda")
+                # Normalize to primary CUDA device (DEV-01 fix)
+                return torch.device("cuda", 0)
             except Exception as e:
                 print(f"CUDA detected but failed verification: {e}")
                 print("Falling back to next available device")

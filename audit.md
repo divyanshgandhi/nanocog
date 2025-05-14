@@ -1,44 +1,62 @@
-Your repo scaffolding lines up very cleanly with the architecture spec—you’ve already nailed \~90 % of what’s needed for a 2-week MVP.  A few quick observations and tweaks to make the build–run loop even smoother:
+# **Nano-Cog 0.1 – Close-out Audit (Release-Candidate Checklist)**
 
-| Area                                  | Looks solid                                                                                     | Gaps / quick wins                                                                                                                                                                                                                                               |                       |                                                                                                                                                              |
-| ------------------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Directory layout**                  | · Clear top-level `experiment/` with `src/`, `data/`, `tests/`, `ui/`<br>· `core/` splits model | retrieval                                                                                                                                                                                                                                                       | tools exactly as spec | • Add a `scripts/` folder (one-off utilities, fine-grained data grabs)<br>• Move `init.py` to `scripts/` or rename to avoid clashing with package `__init__` |
-| **Makefile targets**                  | · Granular (`train-supervised`, `train-toolformer`, `train-rl`)<br>· `help` target prints usage | • Add `lint` / `format` targets (`ruff`, `black`)—helps when more contributors join                                                                                                                                                                             |                       |                                                                                                                                                              |
-| **Config management**                 | · Single YAML under `src/configs/` + helper loader                                              | • Version the config (e.g. `version: 0.1`) so future 370 M run can bump to `0.2` without breakage                                                                                                                                                               |                       |                                                                                                                                                              |
-| **Model class** (`src/core/model.py`) | · Encapsulates load / generate / save hooks                                                     | • Guardrail: detect Metal backend and auto-switch to `torch.set_float32_matmul_precision('high')`                                                                                                                                                               |                       |                                                                                                                                                              |
-| **Tool dispatcher**                   | · Uses `restrictedpython` + allow-list shell → good sandbox                                     | • Return errors in a structured JSON (`{ "error": "...", "traceback": "..." }`) so the model can learn to cope                                                                                                                                                  |                       |                                                                                                                                                              |
-| **Retrieval**                         | · Chroma + MiniLM embeddings<br>· `compose_prompt()` wrapper                                    | • Persist DB path in config; current hard-code means different envs create duplicates                                                                                                                                                                           |                       |                                                                                                                                                              |
-| **Data pipeline**                     | · Mini-GSM8K, HumanEval-mini, Symbolic quiz JSONs present                                       | • Add SHA-256 checksum checks so corrupted downloads surface early                                                                                                                                                                                              |                       |                                                                                                                                                              |
-| **Requirements**                      | · Pinned versions; notes about CUDA on `mamba-ssm`                                              | • You included *both* `torch==2.7.0` **and** `bitsandbytes` (CUDA-only). On M1 you’ll need `bitsandbytes-cpu` or skip entirely—otherwise wheels won’t install.<br>• `transformers` is fine, but for pure SSM you can remove it and cut install time by \~2 min. |                       |                                                                                                                                                              |
-| **Testing**                           | · Skeleton `tests/test_model.py`                                                                | • Add a tiny regression test that runs `model.generate("2+2")` and asserts it returns “4” via `<<calc>>`—makes CI meaningful early                                                                                                                              |                       |                                                                                                                                                              |
-| **UI**                                | · Streamlit app already themed—nice touch                                                       | • Consider caching the retrieval DB across sessions (`st.cache_resource` for Chroma) to cut cold-start                                                                                                                                                          |                       |                                                                                                                                                              |
-| **Init script**                       | · Guided prompts, progress bars                                                                 | • If users pass `--skip-model`, still verify that weights exist; otherwise fail fast                                                                                                                                                                            |                       |                                                                                                                                                              |
+| Severity     | Tag          | Finding                                                                                                                               | Impact                                                                 | Required change                                                                                                                                                                              |
+| ------------ | ------------ | ------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **CRITICAL** | **MODEL-01** | **Weight loading may be “meta” tensors** (no real data) when PyTorch falls back to the Metal backend or when adapters are not merged. | Any forward-pass returns garbage; users see unreadable output.         | *In `src/core/model.py`*<br>`python<br>for n,p in self.model.named_parameters():<br>    if p.is_meta: raise RuntimeError(f\"{n} still on meta\")<br>`<br>Abort if meta tensors are detected. |
+| **CRITICAL** | **MODEL-02** | **Tokenizer ↔ embedding size mismatch after adding Dynamic-Symbol tokens** (resize not called).                                       | IDs that exceed the original vocab index decode to random bytes.       | After tokenizer extension: `self.model.resize_token_embeddings(len(tokenizer))`; re-run adapter fine-tune.                                                                                   |
+| **CRITICAL** | **PIPE-01**  | **Retrieval text is injected unsanitised** → binary, control codes, HTML dump in prompt.                                              | Prompt corruption, generative garbage, possible jail-break vectors.    | In `RetrievalSystem.compose_prompt()`:<br>`python<br>doc = doc.encode('utf-8', 'ignore').decode('utf-8')\n doc = re.sub(r'<[^>]+>', '', doc)[:1024]<br>`                                     |
+| **CRITICAL** | **SEC-01**   | **RestrictedPython sandbox errors leak raw tracebacks** (e.g., OS path).                                                              | Info disclosure & prompt leakage; model can learn internal file paths. | Wrap tool calls; return structured dict `{ok: bool, result: str, error: str}`; truncate tracebacks.                                                                                          |
 
-### Two blockers to fix before training
+| Severity | Tag         | Finding                                                                                        | Impact                                               | Recommended fix                                                                                                                                                  |
+| -------- | ----------- | ---------------------------------------------------------------------------------------------- | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **HIGH** | **DEP-01**  | `requirements.txt` pins **`torch==2.7.0` + `bitsandbytes` (CUDA-only)** → fails on M1 & Metal. | Install fails in CI / user laptops.                  | Split requirements:<br>- `requirements-cpu.txt` (no bitsandbytes, torch ≥2.2, mamba-ssm *cpu* wheel)<br>- `requirements-gpu.txt` (cuda 12.1, bitsandbytes 0.42). |
+| **HIGH** | **INIT-01** | `init.py` *pretends* to download weights; placeholder file only.                               | First CLI run silently loads an empty checkpoint.    | Replace with `huggingface_hub` download in `scripts/download_weights.py`, verify SHA-256.                                                                        |
+| **HIGH** | **DEV-01**  | Device detection compares `"cuda"` vs `"cuda:0"` → superfluous `.to()` copy each turn.         | 3–5 s latency & doubles VRAM on first generation.    | Normalize: `primary = torch.device('cuda', 0) if torch.cuda.is_available() else 'cpu'`; compare via `str(device)`.                                               |
+| **HIGH** | **GEN-01**  | Default `max_new_tokens=1024` for *any* prompt.                                                | Run-away costs & gibberish.                          | In config YAML: `generation: {max_new_tokens: 128, temperature: 0.7, top_p: 0.9}`; allow CLI override.                                                           |
+| **HIGH** | **TEST-01** | Unit-tests only check import; no smoke test for generation or tools.                           | Regressions undetected; CI “green” but model broken. | Add: 1️⃣ `tests/test_generate.py` (“hello” returns “hello/Hi”), 2️⃣ `tests/test_tool_calc.py` (`<<calc>> 3*7` → “21”).                                           |
 
-1. **Model weights URL**
-   Your placeholder download in `init.py` just creates a dummy file.  Either:
+| Severity | Tag         | Finding                                                                       | Impact                                 | Suggested action                                                                                                         |
+| -------- | ----------- | ----------------------------------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| MEDIUM   | **CONF-01** | Single `config.yaml` un-versioned; future updates will overwrite silently.    | Repro mismatch between runs.           | Add `version: 0.1` & bump on every architectural change.                                                                 |
+| MEDIUM   | **CI-01**   | GitHub workflow installs GPU wheels on macOS runner & fails silently.         | No automated assurance.                | Matrix: `{os: [ubuntu-latest, macos-latest], env: [cpu]}`; for GPU use `runpod-ci` self-hosted runner.                   |
+| MEDIUM   | **LOG-01**  | DEBUG logs print raw user prompts / retrieval docs.                           | Privacy & token leakage.               | Mask with `logger.debug("Prompt length=%d", len(prompt))`.                                                               |
+| MEDIUM   | **TOOL-01** | ToolDispatcher raises generic Exception; model receives no hint.              | Response fallback prints stack traces. | Return marker string `"TOOL_ERROR:<tool>:<msg>"`; model can paraphrase.                                                  |
+| MEDIUM   | **UI-01**   | Streamlit replace logic double-replaces `<<calc>>`, corrupts spans.           | Wrong colour markup.                   | Use regex with negative look-behind or wrap once: `re.sub(r'(<<calc>>.*?)', r'<span class="tool-call">\1</span>', txt)`. |
+| MEDIUM   | **DATA-01** | `prepare_data.py` pulls mini-GSM8K from unspecified URL; no checksum/licence. | Future 404s or silently poisoned data. | Pin commit hash, store SHA-256 list, add license check.                                                                  |
+| MEDIUM   | **MEM-01**  | No gradient-checkpoint flag in `train.py`; high VRAM on 7B variants.          | Crash on 16 GB GPUs.                   | Arg `--grad_ckpt`; wrap model blocks in `torch.utils.checkpoint`.                                                        |
 
-   ```bash
-   pip install huggingface_hub
-   huggingface-cli download state-spaces/mamba-130m --local-dir models/mamba-130m --repo-type model
-   ```
-
-   or add a note in `README.md` for manual download.
-
-2. **Metal inference kernels**
-   Torch 2.7’s Metal backend doesn’t yet support 4-bit weights natively.  Your comment about “4-bit inference” is fine, but training on M1 will run in FP16.  Just caveat this in `architecture.md` until Apple’s 4-bit kernels land.
-
----
-
-### Suggested next commits (≤ 1 hour each)
-
-1. **`scripts/download_weights.py`** – a tiny script that auto-pulls from HF with checksum.
-2. **`tests/test_tools.py`** – feed `"<<calc>> 3*7"` through dispatcher and assert `"21"` appears.
-3. **CI** (GitHub Actions) – run `make test` on push; fail if requirements don’t install on `macos-latest`.
+\| LOW | **DOC-01** | README still says “5 GB disk space” (now \~7 GB with retrieval DB). | Misinforms users. | Update install section. |
+\| LOW | **MAKE-01** | `make data` not called from any other target. | Devs forget step. | Add prerequisite: `train: data`. |
+\| LOW | **STYLE-01** | Missing `ruff/black` targets in CI; inconsistent code style. | Minor friction. | Add `make lint` & `make format` to workflow. |
+\| LOW | **SEC-02** | `subprocess` bash tool allow-list only enforced in Python, not in Bash script file. | Users could craft `<<bash>> ; rm -rf /` . | Validate against regex `^[a-zA-Z0-9_\-]+$`; refuse otherwise. |
 
 ---
 
-### Verdict
+## **Implementation Sequence to ship v0.1 final**
 
-**Yes—this looks good.**  You have all critical paths wired, and the repo is cleanly modular.  Solve the two blockers above, add a couple of small quality-of-life targets, and you’re ready to start the LoRA fine-tune tomorrow night.  🚀
+1. **Weights & tokeniser sanity**
+
+   * Fix `INIT-01`, `MODEL-01`, `MODEL-02` (commit #1).
+   * Add embedding resize + smoke test (`TEST-01`).
+
+2. **Retrieval & generation hygiene**
+
+   * Implement `PIPE-01`, `GEN-01`, adjust `RetrievalSystem`.
+
+3. **Dependency & device stability**
+
+   * Resolve `DEP-01`, `DEV-01`; pin torch 2.2 for CPU, 2.2 + cu121 for GPU.
+
+4. **Security hardening**
+
+   * Patch `SEC-01`, `SEC-02`; structured tool errors.
+
+5. **CI & config versioning**
+
+   * Apply `CI-01`, `CONF-01`; add style checks.
+
+6. **Documentation & UX polish**
+
+   * README, Streamlit fix (`UI-01`), Makefile prereqs.
+
+When these items turn green you can **tag v0.1.1**, freeze the branch, and start the GPU-scale v0.2 work on a clean base.

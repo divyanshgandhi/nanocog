@@ -9,6 +9,7 @@ import numpy as np
 from chromadb.config import Settings
 from sentence_transformers import SentenceTransformer
 import sys
+import re
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -147,7 +148,12 @@ class RetrievalSystem:
 
         docs_text = ""
         for i, doc in enumerate(retrieved_docs):
-            docs_text += f"\nSOURCE {i+1}: {doc['text']}"
+            # Sanitize the document text to fix PIPE-01
+            doc_text = doc["text"]
+            # Encode and decode to handle encoding issues, limit to 1024 chars, remove HTML
+            doc_text = doc_text.encode("utf-8", "ignore").decode("utf-8")
+            doc_text = re.sub(r"<[^>]+>", "", doc_text)[:1024]
+            docs_text += f"\nSOURCE {i+1}: {doc_text}"
 
         # Format final prompt
         if docs_text:

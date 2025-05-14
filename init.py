@@ -56,19 +56,57 @@ def download_model():
         script_path = os.path.join("scripts", "download_weights.py")
         if not os.path.exists(script_path):
             print(f"Error: Download script not found at {script_path}")
-            sys.exit(1)
+            # Create scripts directory if it doesn't exist
+            os.makedirs("scripts", exist_ok=True)
+            print("Creating minimal download script...")
+            with open(script_path, "w") as f:
+                f.write(
+                    """#!/usr/bin/env python3
+import os
+import sys
+from huggingface_hub import snapshot_download
+
+def main():
+    model_id = "state-spaces/mamba-130m"
+    if len(sys.argv) > 1:
+        model_id = sys.argv[1]
+    
+    output_dir = os.path.join("models", model_id.split("/")[-1])
+    os.makedirs(output_dir, exist_ok=True)
+    
+    print(f"Downloading {model_id} to {output_dir}...")
+    snapshot_download(
+        repo_id=model_id,
+        local_dir=output_dir,
+        local_dir_use_symlinks=False
+    )
+    print(f"Download complete.")
+
+if __name__ == "__main__":
+    main()
+"""
+                )
+            print(f"Created minimal download script at {script_path}")
 
         # Make script executable
         os.chmod(script_path, 0o755)
 
         # Run the download script
+        model_id = "state-spaces/mamba-130m"
         result = subprocess.run(
-            [sys.executable, script_path, "--model-id", "state-spaces/mamba-130m"],
+            [sys.executable, script_path, "--model-id", model_id],
             check=True,
         )
 
         if result.returncode == 0:
-            print("✓ Model downloaded successfully")
+            model_path = os.path.join("models", model_id.split("/")[-1])
+            # Verify that critical files exist
+            config_path = os.path.join(model_path, "config.json")
+            model_path = os.path.join(model_path, "pytorch_model.bin")
+            if os.path.exists(config_path) and os.path.exists(model_path):
+                print("✓ Model downloaded successfully and verified")
+            else:
+                print("⚠ Model files may be incomplete. Please verify manually.")
         else:
             print("Error: Failed to download model. Check logs for details.")
             sys.exit(1)

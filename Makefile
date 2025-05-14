@@ -1,6 +1,6 @@
 # Nano-Cog 0.1 Makefile
 
-.PHONY: init setup test train evaluate run ui clean help lint format
+.PHONY: init setup test train evaluate run ui clean help lint format install-cpu install-gpu test-all
 
 # Default target
 .DEFAULT_GOAL := help
@@ -90,6 +90,25 @@ clean:
 	@find . -type d -name ".pytest_cache" -exec rm -rf {} +
 	@find . -type d -name ".ipynb_checkpoints" -exec rm -rf {} +
 
+# Install CPU dependencies
+install-cpu:
+	@echo "Installing CPU dependencies..."
+	@pip install -r requirements-cpu.txt
+
+# Install GPU dependencies
+install-gpu:
+	@echo "Installing GPU dependencies..."
+	@pip install -r requirements-gpu.txt
+	@echo ""
+	@echo "Note: You might need to install PyTorch with CUDA separately with the command:"
+	@echo "pip install torch>=2.2.0 --extra-index-url https://download.pytorch.org/whl/cu121"
+	@echo "Visit https://pytorch.org/get-started/locally/ to find the right command for your CUDA version."
+
+# Run all tests
+test-all:
+	@echo "Running all tests..."
+	@$(PYTHON) -m pytest src/tests/
+
 # Display help
 help:
 	@echo "Nano-Cog 0.1 - A laptop-scale language agent with high reasoning efficiency"
@@ -100,7 +119,10 @@ help:
 	@echo "Targets:"
 	@echo "  init             Initialize environment and download model weights"
 	@echo "  setup            Setup environment without downloading model weights"
-	@echo "  test             Run tests"
+	@echo "  install-cpu      Install CPU-specific dependencies"
+	@echo "  install-gpu      Install GPU-specific dependencies with CUDA"
+	@echo "  test             Run basic tests"
+	@echo "  test-all         Run all tests in test directory"
 	@echo "  train            Train full model (supervised → toolformer → RL)"
 	@echo "  train-supervised Train supervised only (LoRA fine-tuning)"
 	@echo "  train-toolformer Train toolformer only"
