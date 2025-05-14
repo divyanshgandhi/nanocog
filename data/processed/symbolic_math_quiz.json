@@ -1,0 +1,52 @@
+[
+  {
+    "prompt": "Solve the following symbolic math problem:\n\nSimplify the expression: (x^2 + 2x + 1) - (x^2 - 3x + 2)",
+    "answer": "To simplify (x^2 + 2x + 1) - (x^2 - 3x + 2), I'll distribute the negative sign and combine like terms.\n\n(x^2 + 2x + 1) - (x^2 - 3x + 2)\n= x^2 + 2x + 1 - x^2 + 3x - 2\n= (x^2 - x^2) + (2x + 3x) + (1 - 2)\n= 0 + 5x - 1\n= 5x - 1\n\nTherefore, the simplified expression is 5x - 1.",
+    "source": "symbolic-math"
+  },
+  {
+    "prompt": "Solve the following symbolic math problem:\n\nSolve for x: 3(x - 4) = 2(x + 5)",
+    "answer": "To solve for x in 3(x - 4) = 2(x + 5):\n\n3(x - 4) = 2(x + 5)\n3x - 12 = 2x + 10\n3x - 2x = 10 + 12\nx = 22\n\nTherefore, x = 22.",
+    "source": "symbolic-math"
+  },
+  {
+    "prompt": "Solve the following symbolic math problem:\n\nFactor the expression: x^2 - 7x + 12",
+    "answer": "To factor x^2 - 7x + 12, I need to find two numbers that multiply to 12 and add to -7.\n\nThe factors of 12 are: 1, 2, 3, 4, 6, 12\nThe pairs of factors are: (1, 12), (2, 6), (3, 4)\n\nChecking the sums:\n1 + 12 = 13\n2 + 6 = 8\n3 + 4 = 7\n\nSince I need a sum of -7, I need negative factors: -3 and -4\n-3 + (-4) = -7 and (-3) \u00d7 (-4) = 12\n\nTherefore: x^2 - 7x + 12 = (x - 3)(x - 4)",
+    "source": "symbolic-math"
+  },
+  {
+    "prompt": "Solve the following symbolic math problem:\n\nFind the derivative of f(x) = 3x^4 - 2x^2 + 5x - 7",
+    "answer": "To find the derivative of f(x) = 3x^4 - 2x^2 + 5x - 7, I'll use the power rule: d/dx(x^n) = n\u00b7x^(n-1).\n\nf(x) = 3x^4 - 2x^2 + 5x - 7\n\nf'(x) = 3\u00b74\u00b7x^(4-1) - 2\u00b72\u00b7x^(2-1) + 5\u00b71\u00b7x^(1-1) - 0\nf'(x) = 12x^3 - 4x^1 + 5 - 0\nf'(x) = 12x^3 - 4x + 5\n\nTherefore, the derivative is f'(x) = 12x^3 - 4x + 5.",
+    "source": "symbolic-math"
+  },
+  {
+    "prompt": "Solve the following symbolic math problem:\n\nExpand and simplify: (2x + 3)^2",
+    "answer": "To expand (2x + 3)^2, I'll use the binomial formula: (a + b)^2 = a^2 + 2ab + b^2\n\n(2x + 3)^2 = (2x)^2 + 2(2x)(3) + 3^2\n= 4x^2 + 12x + 9\n\nTherefore, the expanded and simplified expression is 4x^2 + 12x + 9.",
+    "source": "symbolic-math"
+  },
+  {
+    "prompt": "Solve the following symbolic math problem:\n\nFind all values of x that satisfy the equation: x^2 - x - 6 = 0",
+    "answer": "To solve x^2 - x - 6 = 0, I'll use the quadratic formula: x = (-b \u00b1 \u221a(b^2 - 4ac))/2a, where a = 1, b = -1, and c = -6.\n\nx = (-(-1) \u00b1 \u221a((-1)^2 - 4(1)(-6)))/2(1)\nx = (1 \u00b1 \u221a(1 + 24))/2\nx = (1 \u00b1 \u221a25)/2\nx = (1 \u00b1 5)/2\n\nSo, x = (1 + 5)/2 = 6/2 = 3 or x = (1 - 5)/2 = -4/2 = -2\n\nTherefore, the solutions are x = 3 and x = -2.",
+    "source": "symbolic-math"
+  },
+  {
+    "prompt": "Solve the following symbolic math problem:\n\nSimplify the expression: (2^3 \u00d7 3^2) \u00f7 (2^2 \u00d7 3)",
+    "answer": "To simplify (2^3 \u00d7 3^2) \u00f7 (2^2 \u00d7 3), I'll use the laws of exponents.\n\n(2^3 \u00d7 3^2) \u00f7 (2^2 \u00d7 3)\n= (2^3 \u00f7 2^2) \u00d7 (3^2 \u00f7 3^1)\n= 2^(3-2) \u00d7 3^(2-1)\n= 2^1 \u00d7 3^1\n= 2 \u00d7 3\n= 6\n\nTherefore, the simplified expression is 6.",
+    "source": "symbolic-math"
+  },
+  {
+    "prompt": "Solve the following symbolic math problem:\n\nFind the indefinite integral of f(x) = 2x - 3",
+    "answer": "To find the indefinite integral of f(x) = 2x - 3, I'll use the basic integration rules:\n\u222b(ax^n)dx = a(x^(n+1))/(n+1) + C, where C is the constant of integration.\n\n\u222b(2x - 3)dx = \u222b2x dx - \u222b3 dx\n= 2\u222bx dx - 3\u222bdx\n= 2(x^2/2) - 3x + C\n= x^2 - 3x + C\n\nTherefore, the indefinite integral is F(x) = x^2 - 3x + C, where C is the constant of integration.",
+    "source": "symbolic-math"
+  },
+  {
+    "prompt": "Solve the following symbolic math problem:\n\nSolve the system of equations: 2x + y = 8 and 3x - 2y = 1",
+    "answer": "To solve the system of equations:\n2x + y = 8 ... (1)\n3x - 2y = 1 ... (2)\n\nI'll solve for y in equation (1):\ny = 8 - 2x ... (3)\n\nThen substitute this into equation (2):\n3x - 2(8 - 2x) = 1\n3x - 16 + 4x = 1\n7x - 16 = 1\n7x = 17\nx = 17/7\n\nNow I'll find y by substituting x = 17/7 into equation (3):\ny = 8 - 2(17/7)\ny = 8 - 34/7\ny = 56/7 - 34/7\ny = 22/7\n\nTherefore, the solution is x = 17/7 and y = 22/7.",
+    "source": "symbolic-math"
+  },
+  {
+    "prompt": "Solve the following symbolic math problem:\n\nIf <define symbol=f(x): x^2 + 3x - 4:>, find f(2) and f(-1).",
+    "answer": "I need to evaluate the function f(x) = x^2 + 3x - 4 at x = 2 and x = -1.\n\nFirst, I'll find f(2):\nf(2) = 2^2 + 3(2) - 4\nf(2) = 4 + 6 - 4\nf(2) = 6\n\nNext, I'll find f(-1):\nf(-1) = (-1)^2 + 3(-1) - 4\nf(-1) = 1 - 3 - 4\nf(-1) = -6\n\nTherefore, f(2) = 6 and f(-1) = -6.",
+    "source": "symbolic-math"
+  }
+]

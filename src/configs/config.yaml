@@ -1,0 +1,80 @@
+# Nano-Cog 0.1 Configuration
+
+model:
+  backbone:
+    name: "mamba-130m"
+    checkpoint: "state-spaces/mamba-130m"
+    quantization: "4bit"
+  lora:
+    rank: 64
+    target_modules: ["qkv", "ffn"]
+    insertion_blocks: [22, 23]  # Final two SSM blocks
+  moe:
+    num_experts: 2
+    insertion_block: 12
+    hidden_size: 32
+    temperature: 0.7
+    routing: "top-1"
+  dynamic_symbol_engine:
+    max_tokens: 50
+    grammar_tokens: ["<define symbol=", ":>"]
+
+inference:
+  max_length: 2048
+  temperature: 0.7
+  top_p: 0.9
+  top_k: 40
+  repetition_penalty: 1.1
+
+retrieval:
+  db_path: "data/chroma.sqlite"
+  embedding_model: "sentence-transformers/all-MiniLM-L6-v2"
+  num_results: 3
+  similarity_threshold: 0.7
+
+tools:
+  calc:
+    token: "<<calc>>"
+    timeout_ms: 200
+  python:
+    token: "<<py>>"
+    timeout_ms: 200
+    allowed_modules: ["math", "datetime", "re", "collections", "itertools"]
+  bash:
+    token: "<<bash>>"
+    timeout_ms: 200
+    allowed_commands: ["ls", "cat", "grep", "find", "echo", "wc"]
+
+training:
+  batch_size: 16
+  candidates_per_prompt: 4
+  lr: 1.0e-5
+  optimizer:
+    name: "adamw"
+    beta1: 0.9
+    beta2: 0.95
+  epochs: 2
+  prompts_per_epoch: 400
+  gradient_checkpointing: true
+  precision: "bf16-mixed"
+
+data:
+  sources:
+    - "mini-gsm8k"
+    - "humaneval-mini"
+    - "react-traces"
+  max_token_length: 2048
+
+evaluation:
+  test_sets:
+    - "gsm8k-10pct"
+    - "humaneval-mini"
+    - "symbolic-math-quiz"
+  metrics:
+    - "accuracy"
+    - "reasoning_tokens_per_answer"
+
+ui:
+  port: 8123
+  theme: "light"
+  max_history: 10 
