@@ -36,7 +36,8 @@ model:
     grammar_tokens: ["<def>", "</def>"]
 
 inference:
-  max_length: 512
+  max_length: 4096
+  max_new_tokens: 1024
   temperature: 0.7
   top_p: 0.9
   top_k: 40

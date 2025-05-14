@@ -20,7 +20,8 @@ model:
     grammar_tokens: ["<define symbol=", ":>"]
 
 inference:
-  max_length: 2048
+  max_length: 4096
+  max_new_tokens: 1024
   temperature: 0.7
   top_p: 0.9
   top_k: 40

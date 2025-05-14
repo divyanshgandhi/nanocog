@@ -436,6 +436,9 @@ class NanoCogModel:
         if max_length is None:
             max_length = self.config["inference"]["max_length"]
 
+        # Use max_new_tokens if available in config (preferred over max_length)
+        max_new_tokens = self.config["inference"].get("max_new_tokens", None)
+
         # Process prompt through the DSE
         symbols = self.dse.process_symbol_definitions(prompt)
 
@@ -482,7 +485,6 @@ class NanoCogModel:
 
             # Set generation parameters
             gen_params = {
-                "max_length": max_length,
                 "temperature": self.config["inference"]["temperature"],
                 "top_p": self.config["inference"]["top_p"],
                 "top_k": self.config["inference"]["top_k"],
@@ -490,6 +492,14 @@ class NanoCogModel:
                 "do_sample": True,  # Enable sampling since we're using temperature, top_p and top_k
                 **kwargs,
             }
+
+            # Prefer using max_new_tokens over max_length when available
+            if max_new_tokens:
+                gen_params["max_new_tokens"] = max_new_tokens
+                print(f"Using max_new_tokens: {max_new_tokens}")
+            else:
+                gen_params["max_length"] = max_length
+                print(f"Using max_length: {max_length}")
 
             # Generate text
             try:
