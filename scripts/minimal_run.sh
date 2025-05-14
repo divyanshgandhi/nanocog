@@ -42,6 +42,16 @@ inference:
   top_k: 40
   repetition_penalty: 1.1
 
+tools:
+  calc:
+    token: "<calc>"
+  search:
+    token: "<search>"
+  code:
+    token: "<code>"
+  weather:
+    token: "<weather>"
+
 logging:
   level: "INFO"
   file: "logs/nanocog.log"
