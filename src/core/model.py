@@ -214,18 +214,36 @@ class NanoCogModel:
             # Ignore missing or mismatched weights
             model_kwargs["ignore_mismatched_sizes"] = True
 
-            # Disable device_map entirely - don't use meta tensors
-            model_kwargs["device_map"] = None
+            # Configure device map for optimal loading
+            if self.device.type == "cuda" and torch.cuda.is_available():
+                print(f"Loading model directly on CUDA device: {self.device}")
+                # Use device_map='auto' for CUDA to enable faster loading
+                model_kwargs["device_map"] = "auto"
+            else:
+                # For CPU and other devices, disable device_map
+                model_kwargs["device_map"] = None
+                print(f"Loading model on {self.device}")
 
-            # Load the model directly to CPU first, then move to target device later
-            print("Loading model on CPU first...")
-
-            # Load the model
+            # Load the model directly to the target device when possible
             if os.path.exists(os.path.join(model_path, "config.json")):
                 if "config" not in model_kwargs:
                     # Load config from local path (needed for ignore_mismatched_sizes)
                     model_config = AutoConfig.from_pretrained(model_path)
                     model_kwargs["config"] = model_config
+
+                # Add environment variable settings for bitsandbytes CUDA compatibility
+                if self.device.type == "cuda" and use_quantization:
+                    # Set LD_LIBRARY_PATH for CUDA discovery by bitsandbytes
+                    cuda_lib_path = "/usr/local/cuda/lib64"
+                    if os.path.exists(cuda_lib_path):
+                        current_ld_path = os.environ.get("LD_LIBRARY_PATH", "")
+                        if cuda_lib_path not in current_ld_path:
+                            os.environ["LD_LIBRARY_PATH"] = (
+                                f"{cuda_lib_path}:{current_ld_path}"
+                            )
+                            print(
+                                f"Added {cuda_lib_path} to LD_LIBRARY_PATH for bitsandbytes"
+                            )
 
                 self.model = AutoModelForCausalLM.from_pretrained(
                     model_path, **model_kwargs
@@ -237,6 +255,32 @@ class NanoCogModel:
                     model_checkpoint, **model_kwargs
                 )
                 print(f"Successfully loaded model from HuggingFace hub")
+
+            # Check if model is successfully loaded and not on meta device
+            if hasattr(self.model, "device") and str(self.model.device) == "meta":
+                print(
+                    "WARNING: Model loaded to meta device - attempting fallback without quantization"
+                )
+                # Remove quantization config and try again
+                if "quantization_config" in model_kwargs:
+                    del model_kwargs["quantization_config"]
+                if "load_in_4bit" in model_kwargs:
+                    del model_kwargs["load_in_4bit"]
+
+                print("Retrying model loading without quantization...")
+                try:
+                    self.model = AutoModelForCausalLM.from_pretrained(
+                        (
+                            model_path
+                            if os.path.exists(os.path.join(model_path, "config.json"))
+                            else model_checkpoint
+                        ),
+                        **model_kwargs,
+                    )
+                    print("Successfully loaded model without quantization")
+                except Exception as e:
+                    print(f"Fallback loading also failed: {e}")
+                    raise
 
             # Check if we need to resize token embeddings
             if self.model.get_input_embeddings().weight.shape[0] != len(self.tokenizer):
