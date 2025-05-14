@@ -44,13 +44,25 @@ inference:
 
 tools:
   calc:
-    token: "<calc>"
+    token: "<<calc>>"
+    timeout_ms: 200
   search:
-    token: "<search>"
+    token: "<<search>>"
+    timeout_ms: 200
   code:
-    token: "<code>"
+    token: "<<code>>"
+    timeout_ms: 200
   weather:
-    token: "<weather>"
+    token: "<<weather>>"
+    timeout_ms: 200
+  python:
+    token: "<<py>>"
+    timeout_ms: 200
+    allowed_modules: ["math", "datetime", "re", "collections", "itertools"]
+  bash:
+    token: "<<bash>>"
+    timeout_ms: 200
+    allowed_commands: ["ls", "cat", "grep", "find", "echo", "wc"]
 
 logging:
   level: "INFO"

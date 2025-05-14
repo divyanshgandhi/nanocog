@@ -375,12 +375,24 @@ def main():
     parser.add_argument("--model", type=str, help="Path to model checkpoint")
     parser.add_argument("--config", type=str, help="Path to config file")
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
+    parser.add_argument(
+        "--quantize", action="store_true", help="Enable 4-bit quantization"
+    )
 
     args = parser.parse_args()
 
     if args.debug:
         logger.setLevel(logging.DEBUG)
         logger.debug("Debug logging enabled")
+
+    # Set quantization environment variable if not explicitly enabled
+    if not args.quantize:
+        logger.info("Quantization disabled by default. Use --quantize to enable.")
+        os.environ["NANO_COG_NO_QUANTIZATION"] = "1"
+    else:
+        logger.info("Quantization enabled via --quantize flag")
+        if "NANO_COG_NO_QUANTIZATION" in os.environ:
+            del os.environ["NANO_COG_NO_QUANTIZATION"]
 
     logger.info(f"Model path: {args.model or 'None'}")
     logger.info(f"Config path: {args.config or 'None'}")
