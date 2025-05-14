@@ -1,7 +1,5 @@
 # Nano-Cog 0.1 Dependencies
 
-# Core ML
-torch==2.7.0
 # Note: Mamba model should be downloaded from HuggingFace directly
 # instead of installing mamba-ssm which requires CUDA compilation
 transformers==4.51.3
