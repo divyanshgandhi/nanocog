@@ -108,15 +108,9 @@ class NanoCogModel:
     def __init__(self, config_path=None):
         self.config = load_config(config_path)
 
-        # Determine appropriate device
-        if torch.cuda.is_available():
-            self.device = torch.device("cuda")
-        elif torch.backends.mps.is_available():
-            self.device = torch.device("mps")
-        else:
-            self.device = torch.device("cpu")
-
-        print(f"Using device: {self.device}")
+        # Enhanced device detection with better fallback
+        self.device = self._get_optimal_device()
+        print(f"Selected device: {self.device}")
 
         # Get model checkpoint path
         model_checkpoint = self.config["model"]["backbone"]["checkpoint"]
@@ -251,34 +245,10 @@ class NanoCogModel:
                 )
                 self.model.resize_token_embeddings(len(self.tokenizer))
 
-            # Try to move model to MPS if available (Apple Silicon)
-            if self.device == torch.device("mps"):
-                try:
-                    print("Moving model from CPU to MPS device...")
-                    self.model = self.model.to("mps")
-                except Exception as e:
-                    print(f"Failed to move model to MPS: {e}")
-                    print("Falling back to CPU")
-                    self.device = torch.device("cpu")
-
-            # Check model device
-            model_device = next(self.model.parameters()).device
-            print(f"Model parameter device: {model_device}")
-
-            # Handle meta device warning
-            if str(model_device) == "meta":
-                print(
-                    "WARNING: Model is on meta device - this will cause issues during inference!"
-                )
-                print(
-                    "This is likely because the model is too large for the available memory,"
-                )
-                print(
-                    "or there's an issue with the Mamba implementation on this platform."
-                )
-                print(
-                    "The model will still be loaded but may not be able to generate text."
-                )
+            # Move model to target device
+            success = self._move_model_to_device()
+            if not success:
+                print("WARNING: Failed to move model to any device properly")
 
         except Exception as e:
             print(f"Failed to load model: {e}")
@@ -292,6 +262,76 @@ class NanoCogModel:
 
         # Initialize Dynamic Symbol Engine
         self.dse = DynamicSymbolEngine(self.config, self.tokenizer)
+
+    def _get_optimal_device(self):
+        """Determine the best available device with verification"""
+        print("Detecting available compute devices...")
+
+        # CUDA (NVIDIA GPU) - First priority
+        if torch.cuda.is_available():
+            try:
+                # Verify CUDA works by creating a small tensor
+                test_tensor = torch.zeros(1, 1, device="cuda")
+                cuda_device_name = torch.cuda.get_device_name(0)
+                print(f"CUDA is available: {cuda_device_name}")
+                return torch.device("cuda")
+            except Exception as e:
+                print(f"CUDA detected but failed verification: {e}")
+                print("Falling back to next available device")
+        else:
+            print("CUDA not available")
+
+        # Metal (Apple Silicon) - Second priority
+        if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+            try:
+                # Verify MPS works
+                test_tensor = torch.zeros(1, 1, device="mps")
+                print("Apple Silicon Metal acceleration is available")
+                return torch.device("mps")
+            except Exception as e:
+                print(f"Metal detected but failed verification: {e}")
+                print("Falling back to CPU")
+        else:
+            print("Metal acceleration not available")
+
+        # CPU - Final fallback
+        print("Using CPU device")
+        return torch.device("cpu")
+
+    def _move_model_to_device(self):
+        """Safely move model to the selected device with proper error handling"""
+        try:
+            print(f"Moving model to {self.device}...")
+            # Check current device
+            current_device = next(self.model.parameters()).device
+
+            # Only move if needed
+            if current_device != self.device:
+                self.model = self.model.to(self.device)
+                # Verify model is on correct device
+                new_device = next(self.model.parameters()).device
+                print(f"Model moved from {current_device} to {new_device}")
+
+                # Verify model isn't on meta device
+                if str(new_device) == "meta":
+                    print("WARNING: Model is still on meta device after move attempt!")
+                    print("Attempting CPU fallback...")
+                    self.device = torch.device("cpu")
+                    self.model = self.model.to("cpu")
+            else:
+                print(f"Model already on {current_device}, no move needed")
+
+            return True
+        except Exception as e:
+            print(f"Error moving model to {self.device}: {e}")
+            print("Falling back to CPU")
+            self.device = torch.device("cpu")
+            try:
+                self.model = self.model.to("cpu")
+                return True
+            except Exception as e2:
+                print(f"Critical error: Failed to move model to CPU: {e2}")
+                return False
 
     def _setup_lora_adapters(self):
         """Setup LoRA adapters for the model"""
@@ -322,56 +362,106 @@ class NanoCogModel:
         # Process prompt through the DSE
         symbols = self.dse.process_symbol_definitions(prompt)
 
-        # Check if model is in a usable state
-        model_device = next(self.model.parameters()).device
-        print(f"Current model device when generating: {model_device}")
-
-        # If model is on meta device, we can't use it for inference
-        if str(model_device) == "meta":
-            print("Model is on meta device - cannot perform inference")
-            return (
-                "[Model Error: The model is not initialized properly for inference. "
-                + "This is a known issue with Mamba models on Apple Silicon. "
-                + "Please try again with a smaller model or on a different device.]"
-            )
-
-        # Prepare inputs
-        inputs = self.tokenizer(prompt, return_tensors="pt")
-
-        # Move inputs to the same device as the model
+        # Verify model is on the correct device
         try:
-            inputs = {k: v.to(model_device) for k, v in inputs.items()}
+            model_device = next(self.model.parameters()).device
+            print(f"Current model device when generating: {model_device}")
+
+            # If device mismatch, try to fix it
+            if model_device != self.device:
+                print(
+                    f"Device mismatch detected: model on {model_device}, should be on {self.device}"
+                )
+                success = self._move_model_to_device()
+                if not success:
+                    return "[Error: Failed to prepare model for inference. Device configuration issue.]"
+
+            # If model is on meta device, we can't use it for inference
+            if str(model_device) == "meta":
+                print("Model is on meta device - cannot perform inference")
+                return (
+                    "[Model Error: The model is not initialized properly for inference. "
+                    + "This is a known issue with Mamba models. "
+                    + "Please try again with a smaller model or on a different device.]"
+                )
+
+            # Prepare inputs
+            inputs = self.tokenizer(prompt, return_tensors="pt")
+
+            # Move inputs to the correct device
+            try:
+                inputs = {k: v.to(self.device) for k, v in inputs.items()}
+            except Exception as e:
+                print(f"Error moving inputs to {self.device}: {e}")
+                print("Falling back to CPU for inputs")
+                self.device = torch.device("cpu")
+                try:
+                    # Move model to CPU as a last resort
+                    self.model = self.model.to("cpu")
+                    inputs = {k: v.to("cpu") for k, v in inputs.items()}
+                except Exception as e2:
+                    print(f"Critical error moving to CPU: {e2}")
+                    return f"[Critical Error: {str(e2)}]"
+
+            # Set generation parameters
+            gen_params = {
+                "max_length": max_length,
+                "temperature": self.config["inference"]["temperature"],
+                "top_p": self.config["inference"]["top_p"],
+                "top_k": self.config["inference"]["top_k"],
+                "repetition_penalty": self.config["inference"]["repetition_penalty"],
+                "do_sample": True,  # Enable sampling since we're using temperature, top_p and top_k
+                **kwargs,
+            }
+
+            # Generate text
+            try:
+                with torch.no_grad():
+                    # Debug info
+                    print(
+                        f"Generating with model on {self.device}, inputs on {next(iter(inputs.values())).device}"
+                    )
+                    outputs = self.model.generate(**inputs, **gen_params)
+
+                # Decode output
+                generated_text = self.tokenizer.decode(
+                    outputs[0], skip_special_tokens=True
+                )
+                return generated_text
+            except RuntimeError as e:
+                if "CUDA out of memory" in str(e):
+                    print(f"CUDA out of memory error: {e}")
+                    print("Attempting to fall back to CPU...")
+
+                    # Move model to CPU and try again
+                    self.device = torch.device("cpu")
+                    self.model = self.model.to("cpu")
+                    inputs = {k: v.to("cpu") for k, v in inputs.items()}
+
+                    with torch.no_grad():
+                        outputs = self.model.generate(**inputs, **gen_params)
+
+                    generated_text = self.tokenizer.decode(
+                        outputs[0], skip_special_tokens=True
+                    )
+                    return generated_text
+                else:
+                    print(f"Error during text generation: {e}")
+                    error_msg = (
+                        f"[Model Error: {str(e)}. This might be due to a memory issue "
+                        + "or incompatibility with this hardware.]"
+                    )
+                    return error_msg
+            except Exception as e:
+                print(f"Error during text generation: {e}")
+                error_msg = (
+                    f"[Model Error: {str(e)}. This is likely due to device mismatch "
+                    + "or memory issues on this device.]"
+                )
+                return error_msg
         except Exception as e:
-            print(f"Error moving inputs to {model_device}: {e}")
-            # Fall back to CPU
-            inputs = {k: v for k, v in inputs.items()}
-
-        # Set generation parameters
-        gen_params = {
-            "max_length": max_length,
-            "temperature": self.config["inference"]["temperature"],
-            "top_p": self.config["inference"]["top_p"],
-            "top_k": self.config["inference"]["top_k"],
-            "repetition_penalty": self.config["inference"]["repetition_penalty"],
-            "do_sample": True,  # Enable sampling since we're using temperature, top_p and top_k
-            **kwargs,
-        }
-
-        # Generate text
-        try:
-            with torch.no_grad():
-                outputs = self.model.generate(**inputs, **gen_params)
-
-            # Decode output
-            generated_text = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-            return generated_text
-        except Exception as e:
-            print(f"Error during text generation: {e}")
-            error_msg = (
-                f"[Model Error: {str(e)}. This is likely due to device mismatch "
-                + "or memory issues on this device.]"
-            )
-            return error_msg
+            print(f"Critical error during generation setup: {e}")
+            return f"[Critical Error: {str(e)}]"
 
     def save(self, path):
         """Save model and adapters"""
