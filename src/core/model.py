@@ -171,6 +171,17 @@ class NanoCogModel:
         use_quantization = self.config["model"]["backbone"]["quantization"] == "4bit"
         torch_dtype = torch.float16
 
+        # Check environment variable to force disable quantization
+        if os.environ.get("NANO_COG_NO_QUANTIZATION", "").lower() in [
+            "1",
+            "true",
+            "yes",
+        ]:
+            print(
+                "NANO_COG_NO_QUANTIZATION environment variable detected, disabling quantization"
+            )
+            use_quantization = False
+
         # Detect if we're on macOS / Apple Silicon
         is_mac = sys.platform == "darwin"
         if is_mac and torch.backends.mps.is_available():
