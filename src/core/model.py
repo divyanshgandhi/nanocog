@@ -227,13 +227,17 @@ class NanoCogModel:
 
             # Configure device map for optimal loading
             if self.device.type == "cuda" and torch.cuda.is_available():
-                print(f"Loading model directly on CUDA device: {self.device}")
-                # Use device_map='auto' for CUDA to enable faster loading
-                model_kwargs["device_map"] = "auto"
+                print(f"Loading model for CUDA device: {self.device}")
+                # Avoid using device_map="auto" as it creates meta tensors that can't be moved
+                # model_kwargs["device_map"] = "auto"  # This causes meta tensor issues
+
+                # Set device to None during loading to avoid meta tensor issues
+                model_kwargs["device_map"] = None
+                # We'll move to the device after loading
             else:
                 # For CPU and other devices, disable device_map
                 model_kwargs["device_map"] = None
-                print(f"Loading model on {self.device}")
+                print(f"Loading model for {self.device}")
 
             # Load the model directly to the target device when possible
             if os.path.exists(os.path.join(model_path, "config.json")):
@@ -357,36 +361,54 @@ class NanoCogModel:
         """Safely move model to the selected device with proper error handling"""
         try:
             print(f"Moving model to {self.device}...")
-            # Check current device
-            current_device = next(self.model.parameters()).device
 
-            # Only move if needed
-            if current_device != self.device:
-                self.model = self.model.to(self.device)
-                # Verify model is on correct device
-                new_device = next(self.model.parameters()).device
-                print(f"Model moved from {current_device} to {new_device}")
-
-                # Verify model isn't on meta device
-                if str(new_device) == "meta":
-                    print("WARNING: Model is still on meta device after move attempt!")
-                    print("Attempting CPU fallback...")
-                    self.device = torch.device("cpu")
-                    self.model = self.model.to("cpu")
-            else:
-                print(f"Model already on {current_device}, no move needed")
-
-            return True
-        except Exception as e:
-            print(f"Error moving model to {self.device}: {e}")
-            print("Falling back to CPU")
-            self.device = torch.device("cpu")
+            # Check for meta tensors
             try:
-                self.model = self.model.to("cpu")
+                current_device = next(self.model.parameters()).device
+                is_meta = str(current_device) == "meta"
+            except Exception:
+                is_meta = False
+
+            if is_meta:
+                print("Detected meta tensors, using to_empty() to initialize the model")
+                try:
+                    # For meta tensors, we need to use to_empty() first
+                    self.model = self.model.to_empty(device=self.device)
+                    print(
+                        f"Successfully initialized model on {self.device} using to_empty()"
+                    )
+                    return True
+                except Exception as e:
+                    print(f"Failed to move meta tensors with to_empty(): {e}")
+                    print("Falling back to CPU with standard loading")
+
+            # Standard movement for non-meta tensors
+            try:
+                # Check current device for non-meta tensors
+                if not is_meta:
+                    current_device = next(self.model.parameters()).device
+                    # Only move if needed
+                    if current_device != self.device:
+                        self.model = self.model.to(self.device)
+                        # Verify model is on correct device
+                        new_device = next(self.model.parameters()).device
+                        print(f"Model moved from {current_device} to {new_device}")
+                    else:
+                        print(f"Model already on {current_device}, no move needed")
                 return True
-            except Exception as e2:
-                print(f"Critical error: Failed to move model to CPU: {e2}")
-                return False
+            except Exception as e:
+                print(f"Error moving model to {self.device}: {e}")
+                print("Falling back to CPU")
+                self.device = torch.device("cpu")
+                try:
+                    self.model = self.model.to("cpu")
+                    return True
+                except Exception as e2:
+                    print(f"Critical error: Failed to move model to CPU: {e2}")
+                    return False
+        except Exception as e:
+            print(f"Unexpected error in _move_model_to_device: {e}")
+            return False
 
     def _setup_lora_adapters(self):
         """Setup LoRA adapters for the model"""
